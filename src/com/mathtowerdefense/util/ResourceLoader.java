@@ -49,17 +49,42 @@ public final class ResourceLoader {
      */
     public static InputStream openStream(String path) {
         String p = normalise(path);
+        if (p.isEmpty()) {
+            return null;
+        }
+
+        String stripped = p.startsWith("resources/") ? p.substring("resources/".length()) : p;
+        String withResources = p.startsWith("resources/") ? p : "resources/" + p;
+
+        // 1. Classpath lookup (check exact, stripped, and with "resources/" prefix)
         InputStream onClasspath = ResourceLoader.class.getResourceAsStream("/" + p);
         if (onClasspath != null) {
             return onClasspath;
         }
-        try {
-            Path file = Paths.get("resources", p);
-            if (Files.isRegularFile(file)) {
-                return Files.newInputStream(file);
+        onClasspath = ResourceLoader.class.getResourceAsStream("/" + stripped);
+        if (onClasspath != null) {
+            return onClasspath;
+        }
+        onClasspath = ResourceLoader.class.getResourceAsStream("/" + withResources);
+        if (onClasspath != null) {
+            return onClasspath;
+        }
+
+        // 2. Relative file lookup (supports running from MathTowerDefense or workspace root)
+        Path[] candidates = new Path[] {
+            Paths.get("resources", stripped),
+            Paths.get("MathTowerDefense", "resources", stripped),
+            Paths.get(p),
+            Paths.get("MathTowerDefense", p)
+        };
+        for (Path file : candidates) {
+            try {
+                if (Files.isRegularFile(file)) {
+                    return Files.newInputStream(file);
+                }
+            } catch (IOException | SecurityException ignored) {
+                // fall through to next candidate
             }
-        } catch (IOException | SecurityException ignored) {
-            // fall through to null
         }
         return null;
     }

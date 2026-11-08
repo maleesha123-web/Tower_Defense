@@ -15,6 +15,9 @@ import javax.swing.SwingWorker;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 
 /**
  * Login screen: username/password form, register link and guest play.
@@ -25,7 +28,7 @@ public class LoginGUI extends JPanel {
 
     private final MainGUI main;
     private final JTextField usernameField = Theme.field(18);
-    private final JPasswordField passwordField = new JPasswordField(18);
+    private final JPasswordField passwordField = Theme.passwordField(18);
     private final JLabel messageLabel = new JLabel(" ");
     private final JButton loginButton = Theme.primaryButton("LOGIN");
 
@@ -33,8 +36,10 @@ public class LoginGUI extends JPanel {
         this.main = main;
         setLayout(new BorderLayout());
         setBackground(Theme.BG);
+        setOpaque(false);
 
-        JPanel form = Theme.panel();
+        JPanel form = new JPanel();
+        form.setOpaque(false);
         form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
         Theme.pad(form, 40, 60, 40, 60);
 
@@ -157,5 +162,14 @@ public class LoginGUI extends JPanel {
                 }
             }
         }.execute();
+    }
+    @Override
+    protected void paintComponent(Graphics g) {
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                RenderingHints.VALUE_ANTIALIAS_ON);
+        Theme.paintCoverBackground(g2, Theme.getLoginBackground(), getWidth(), getHeight(), 0.40f);
+        g2.dispose();
+        super.paintComponent(g);
     }
 }
