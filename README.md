@@ -1,224 +1,139 @@
-# MATH TOWER DEFENSE 2D
+# Math Tower Defense 2D
 
-A complete, playable 2D tower-defense game written in pure Java (Swing/Java2D)
-where mathematical questions drive the combat: correct answers charge your
-towers with **Math Power** (+50% damage), wrong answers or timeouts weaken them
-(−50% damage) plus health/coin penalties.
-
-**Course:** Java Software Engineering / Game Development (academic assessment)
+A 2D tower defense game built with Java (Swing & Java2D) where mathematical challenges power up your defense. Correct answers boost towers with **Math Power** (+50% damage), while incorrect answers or timeouts weaken them.
 
 ---
 
-## 1. Features
+## Features
 
-- **Full game flow:** START → LOGIN / REGISTER (or guest) → MAIN MENU → GAME
-  (10 waves, bosses on waves 5 & 10) → VICTORY / GAME OVER → SCORE saved →
-  LEADERBOARD
-- **Fish Game API integration:** questions are fetched live from the official
-  service; images are displayed and parsed formats are exactly the documented
-  ones (`?out=json`, `?out=json&base64=yes`, `?out=csv`)
-- **Failure-proof API layer:** on any network problem the game shows
-  "Unable to connect to Math Question Service." and continues in clearly
-  labelled **OFFLINE FALLBACK MODE** (local arithmetic questions)
-- **4 tower types** (Basic, Rapid, Power, Math Boost) with 4 upgrade levels,
-  visible projectiles, first-in-range targeting, range rings, level pips
-- **4 enemy types** (Normal, Fast, Tank, Boss) with health bars + crown for
-  bosses, particles and floating score text on kills
-- **Scoring & coins:** kills +100 (boss +1000), correct +50, wave +500,
-  wrong −25, combo bonuses at 3/5/10, coins for everything, tower upgrades
-- **Authentication:** register/login with PBKDF2-SHA256 hashed passwords,
-  sessions, logout, guest play
-- **MySQL persistence:** scores + lifetime statistics + leaderboard
-- **Sound:** 12 synthesized SFX + an 8-second background-music loop, all
-  procedurally generated (13 real `.wav` files ship in `resources/sounds`;
-  missing files are re-rendered live from the same recipes - sound never
-  crashes the game)
-- **Pause, settings (sound/music/difficulty), help, profile, game-over screens**
-- **~150 automated tests** run with zero dependencies
+- **Tower Defense Gameplay:** 10 waves, 4 tower types (Basic, Rapid, Power, Math Boost) with upgrades, and 4 enemy types (Normal, Fast, Tank, Boss).
+- **Fish Game API Integration:** Live mathematical challenges fetched directly from the external Fish Game API.
+- **User Authentication & Leaderboard:** Player accounts with secure hashed passwords (PBKDF2) and persistent leaderboard tracking (MySQL), plus guest play support.
+- **Audio & Visuals:** Built-in retro sound effects, background music, custom artwork, and styled UI screens.
 
 ---
 
-## 2. Technologies
+## Architecture
 
-| Component | Technology |
-|---|---|
-| Language | Java 17 (LTS) |
-| GUI / rendering | Swing + Java2D (zero frameworks) |
-| HTTP | `java.net.HttpURLConnection` (stdlib) |
-| JSON | minimal field extraction (stdlib regex, documented 3-field response) |
-| Database | MySQL / MariaDB via JDBC (`java.sql` only — compiles without the JAR) |
-| Passwords | PBKDF2WithHmacSHA256 + random salt (stdlib) |
-| Build | `javac` directly, or Eclipse (`.project` / `.classpath` included) |
+The project follows a modular, layered architecture that decouples rendering, simulation, and external services:
+
+```
+┌────────────────────────────────────────────────────────┐
+│                   Presentation Layer                   │
+│   Swing Views (MainGUI, GameGUI, MathChallengeOverlay) │
+└───────────────────────────┬────────────────────────────┘
+                            │
+┌───────────────────────────▼────────────────────────────┐
+│                   Engine & Managers                    │
+│      GameLoop (60 FPS) ── GameEngine (State Machine)   │
+│   WaveManager • TowerManager • EnemyManager • Sound    │
+└──────────────┬──────────────────────────┬──────────────┘
+               │                          │
+┌──────────────▼─────────────┐ ┌──────────▼──────────────┐
+│       Game Entities        │ │   Services & External   │
+│  Towers, Enemies, Player,  │ │ • FishGameAPI (HTTP)    │
+│  Projectiles, GameMap      │ │ • Auth & Score Services │
+└────────────────────────────┘ │ • MySQL DAOs (JDBC)     │
+                               └─────────────────────────┘
+```
+
+- **Presentation Layer (`gui`):** Swing-based user interface and rendering. Does not contain gameplay rules.
+- **Engine Layer (`engine`, `managers`):** Drives the 60 FPS update loop, entity movement, collisions, and wave progressions.
+- **Domain Layer (`entities`, `models`):** Encapsulates towers, enemies, projectiles, and player statistics.
+- **Service & Data Layer (`api`, `authentication`, `database`):** Handles asynchronous HTTP requests to the Fish Game API, PBKDF2 password hashing, and MySQL persistence via JDBC.
 
 ---
 
-## 3. Project structure
+## Project Structure
 
 ```
 MathTowerDefense/
-├── .project / .classpath / .settings   Eclipse metadata (import-ready)
-├── .env.example                        safe config template (NO real secrets)
-├── mathtowerdefense.sql                XAMPP database setup script
-├── README.md
-├── libs/                               optional: mysql-connector-j.jar (runtime)
-├── resources/                          optional images / sounds / fonts
-│   (game runs fine when these are empty - all visuals have Java2D fallbacks)
-└── src/com/mathtowerdefense/
-    ├── engine/        Game, GameEngine, GameLoop, GameState, GameMap,
-    │                  GameConfig, CollisionManager, SoundManager
-    ├── entities/      Player, Base, Enemy(+EnemyType), Tower(+TowerType,
-    │                  Basic/Rapid/Power/MathBoost), Projectile, Wave
-    ├── gui/           MainGUI (main()), Login-, Register-, MainMenu-, Game-,
-    │                  GameBoard(panel), MathChallengeOverlay, Profile-,
-    │                  Leaderboard-, Help-, Settings-, GameOver-GUI, Theme
-    ├── authentication/ LoginService, RegisterService, SessionManager, PasswordHasher
-    ├── api/           FishGameAPI, Question, APIResponse, ApiConfig, LocalQuestionGenerator
-    ├── managers/      WaveManager, TowerManager, EnemyManager, ScoreManager,
-    │                  LevelManager, QuestionManager, ScoreService
-    ├── database/      DatabaseConnection, UserDAO, ScoreDAO, LeaderboardDAO
-    ├── models/        User, Score, PlayerStats
-    └── tests/         TestRunner (plain-Java assertions)
+├── libs/                    # External libraries (MySQL Connector/J)
+├── resources/               # Game assets
+│   ├── images/              # UI backgrounds and artwork
+│   └── sounds/              # Sound effects and music loop (.wav)
+├── src/com/mathtowerdefense/
+│   ├── api/                 # Fish Game API client & question handling
+│   ├── authentication/      # Registration, login & PBKDF2 password hashing
+│   ├── database/            # MySQL database connection & DAO layer
+│   ├── engine/              # Game loop, state machine & audio manager
+│   ├── entities/            # Towers, enemies, projectiles & player
+│   ├── gui/                 # Swing views, overlays & dark theme
+│   ├── managers/            # Wave, tower, score & question managers
+│   ├── models/              # User, score & player statistics models
+│   ├── tests/               # Automated unit & integration test runner
+│   └── util/                # Resource loading utility
+└── mathtowerdefense.sql     # Database schema and setup script
 ```
 
-Architecture (assessment-friendly):
-
-```
-              ┌──────────────────────┐
-              │       GUI Layer      │  MainGUI + screens
-              └──────────┬───────────┘
-                         │
-              ┌──────────▼───────────┐
-              │    Service Layer     │  Login/Register/ScoreService
-              └──────────┬───────────┘
-                         │
-      ┌──────────────────┼──────────────────┐
-      │                  │                  │
-      ▼                  ▼                  ▼
- Game Managers       Fish Game API       DAO Layer
-  (waves/towers/    (QuestionManager      (User/Score/
-   enemies/score)    -> FishGameAPI)       Leaderboard)
-      │                  │                  │
-      ▼                  ▼                  ▼
- Game Entities    External Service       MySQL
- (Enemy/Tower)    (marcconrad.com)
-      │
-      ▼
-  Game Engine (state machine + 60 FPS loop)
-```
 ---
 
-## 4. Fish Game API integration (external service)
+## Requirements
 
-Official documentation: <https://marcconrad.com/uob/fish/doc.php>
-Examples: <https://marcconrad.com/uob/fish/>
+- **Java 17 (JDK) or higher**
+- **MySQL / XAMPP** (optional – required only for accounts and leaderboard; guests can play without a database)
+- **MySQL Connector/J** (`libs/mysql-connector-j-8.0.33.jar` included)
 
-| Item | Value (exactly as documented) |
+---
+
+## How to Run
+
+### In an IDE (Eclipse / IntelliJ)
+1. Import the project as an **Existing Java Project**.
+2. Ensure `src/` and `resources/` are set as source folders.
+3. Ensure `libs/mysql-connector-j-8.0.33.jar` is on the build path / classpath.
+4. Run `com.mathtowerdefense.gui.MainGUI` as a Java Application.
+
+### From the Command Line
+From the `MathTowerDefense` directory:
+
+```bash
+# Compile
+javac -encoding UTF-8 -d bin -cp "libs/*;resources" (Get-ChildItem -Recurse -Filter *.java src | % { $_.FullName })
+
+# Run Game
+java -cp "bin;libs/*;resources" com.mathtowerdefense.gui.MainGUI
+
+# Run Tests
+java -cp "bin;libs/*" com.mathtowerdefense.tests.TestRunner
+```
+
+---
+
+## Database Setup (Optional)
+
+1. Start Apache & MySQL in **XAMPP Control Panel**.
+2. Open **phpMyAdmin** (`http://localhost/phpmyadmin`).
+3. Import `mathtowerdefense.sql` to create the `mathtowerdefense` database.
+4. The application connects by default to `localhost:3306` with user `root` and no password (configurable via environment variables in `.env.example`).
+
+---
+
+## How to Play
+
+### 1. Objective
+Defend your base against 10 waves of enemies traveling along the path. If enemies reach the base, base health decreases. Defeat all 10 waves to win (Bosses arrive on waves 5 & 10).
+
+### 2. Building & Upgrading Towers
+- Select a tower from the **Tower Shop** on the right and click on grass to place it (towers cannot be placed on the road).
+- Click any existing tower to inspect stats and upgrade it (Levels 1–4):
+  - **Basic Tower:** Balanced cost, range, and damage.
+  - **Rapid Tower:** High fire rate, ideal against fast enemies.
+  - **Power Tower:** High single-shot damage, strong against tanks and bosses.
+  - **Math Boost Tower:** Grants bonus coins and score on correct challenge answers.
+
+### 3. Math Challenges
+Periodically, the battle pauses for a math challenge fetched from the Fish Game API:
+- **Solve:** Count the fish shown in the picture and submit the number.
+- **Correct Answer:** Activates **Math Power** (+50% tower damage for 12s), +50 score, +15 coins, and builds combo multipliers.
+- **Wrong / Timeout:** **Weakens** towers (-50% damage for 8s), deducts score/coins, and inflicts -5 base HP damage.
+
+---
+
+## Controls
+
+| Control | Action |
 |---|---|
-| Base URL | `http://marcconrad.com/uob/fish/api.php` |
-| JSON | `?out=json` → `{ "question" : "<image url>", "fish" : 9, "chest" : 1 }` |
-| Base64 | `?out=json&base64=yes` → `question` holds the PNG as base64 |
-| CSV | `?out=csv` → `<image url>,9,1` |
-| **Auth** | **none** — the docs define no API key |
-
-Code: `com.mathtowerdefense.api` (`FishGameAPI`, `Question`, `APIResponse`,
-`ApiConfig`) is isolated from game logic; the engine talks only to
-`managers/QuestionManager`.
-
-Semantics: the official game asks *"Enter the number of fish in the picture"*,
-so the answer used is the documented `fish` value. The request strategy is:
-
-1. `?out=json` and download the image URL (manual 301 http→https redirect
-   following — Java does *not* auto-follow cross-scheme redirects);
-2. if the image cannot be fetched, retry with the documented
-   `?out=json&base64=yes` variant;
-3. if everything fails, `QuestionManager` generates a **local** question with
-   `Question.Source.LOCAL_FALLBACK`. The HUD/badge always shows
-   **API MODE** vs **OFFLINE FALLBACK MODE**, so a local question never
-   pretends to be from the API.
-
-`FISH_API_KEY` (see `.env.example`, `ApiConfig`) is provided only as a central
-configuration hook — per the official documentation it is **not required and
-never sent**. Do not invent request parameters beyond the documented `out` and
-`base64`.
-
----
-
-## 5. Database setup (XAMPP)
-
-1. Start **Apache + MySQL** in the XAMPP Control Panel.
-2. Open phpMyAdmin → **Import** → choose `mathtowerdefense.sql` → Go
-   (or `mysql -u root < mathtowerdefense.sql`).
-3. This creates the database `mathtowerdefense` with tables `users`,
-   `scores`, `player_stats` plus a few sample leaderboard rows. The sample
-   users' hashes are placeholders and cannot be used to log in.
-
-Connection (env vars, see `.env.example`; XAMPP defaults otherwise):
-
-```
-MTD_DB_URL=jdbc:mysql://localhost:3306/mathtowerdefense?...
-MTD_DB_USER=root
-MTD_DB_PASSWORD=
-```
-
-Quick start for a working login/leaderboard:
-
-1. Download **MySQL Connector/J** (mysql-connector-j-8.x.jar) into `libs/`
-   and, in Eclipse, *Build Path → Add JARs…* (the code imports only
-   `java.sql`, so it compiles even without the JAR).
-2. Run the game, **Create Account**, log in, play.
-
-Database unavailability is handled everywhere with friendly messages; the game
-remains fully playable via **Play as Guest** (scores simply are not saved).
-
----
-
-## 6. Import into Eclipse & run
-
-1. **File → Import… → General → Existing Projects into Workspace** →
-   select the `MathTowerDefense` folder → Finish.
-   (The folder contains `.project` / `.classpath` / `.settings` with Java 17
-   compliance, and `src` + `resources` as source folders.)
-2. (Optional for database) add `libs/mysql-connector-j-*.jar` to the build path
-   and start MySQL as described above.
-3. **Main class:** `com.mathtowerdefense.gui.MainGUI` →
-   *Run As → Java Application*.
-
-Command line (from the project folder):
-
-```
-Get-ChildItem src -Recurse -Filter *.java | % { $_.FullName } |
-    Out-File -Encoding ascii sources.txt
-javac -encoding UTF-8 -d bin @sources.txt
-xcopy /E /I /Y resources bin
-java -cp bin com.mathtowerdefense.gui.MainGUI
-java -cp bin com.mathtowerdefense.tests.TestRunner        # 154 tests
-java -cp bin com.mathtowerdefense.tests.TestRunner --live # + 1 real API call
-java -cp bin com.mathtowerdefense.tests.SoundAssetExporter # regenerate the 13 .wav files
-```
-
-## 7. Game controls
-
-| Input | Action |
-|---|---|
-| Mouse click (shop, then map) | build tower |
-| Mouse click on existing tower | select / inspect / upgrade |
-| Esc or P | pause / resume |
-| Text field + ENTER / SUBMIT | answer a math challenge |
-| Buttons | coins guard everything (no negative balances) |
-
-## 8. Known limitations
-
-- Leaderboard/profile require MySQL running (guests play without saving).
-- Challenge images are one per API call; rapid question spam is limited by
-  the 15 s challenge cadence.
-- The official service may be discontinued without notice (stated on the doc
-  page) — the game still works fully in offline fallback mode.
-- Sound files are tiny 8-bit retro-style tones; audiophiles can replace any
-  `.wav` in `resources/sounds/` (same name, same format) — or regenerate them
-  with the exporter.
-
-## 9. Credits
-
-- Fish Game API & documentation © Marc Conrad
-  (<https://marcconrad.com/uob/fish/>) — used strictly as documented.
-- Everything else (engine, entities, GUI, database): this project.
+| **Left Click** | Select shop item / place tower on map / inspect & upgrade tower |
+| **Number Input + Enter / Submit** | Submit answer for math challenge |
+| **P / Esc** | Pause / resume game |
