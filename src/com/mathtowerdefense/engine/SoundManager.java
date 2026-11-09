@@ -6,9 +6,14 @@ import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Clip;
 import javax.sound.sampled.FloatControl;
 import javax.sound.sampled.DataLine;
+import javax.sound.sampled.LineEvent;
 import java.io.ByteArrayInputStream;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import com.mathtowerdefense.util.ResourceLoader;
 
 /**
@@ -59,6 +64,13 @@ public final class SoundManager {
 
     private final Map<Sound, byte[]> loadedClips = new HashMap<>();
     private final Map<Sound, Long> lastPlayed = new HashMap<>();
+    private final ExecutorService soundPool = Executors.newCachedThreadPool(r -> {
+        Thread worker = new Thread(r);
+        worker.setDaemon(true);
+        worker.setName("sfx-worker");
+        return worker;
+    });
+    private byte[] musicData;
     private Clip musicClip;
     private boolean musicPlaying;
 
@@ -71,13 +83,14 @@ public final class SoundManager {
                 loadedClips.put(s, data);
             }
         }
+        musicData = loadResource("/sounds/music.wav");
     }
 
     public static SoundManager getInstance() { return INSTANCE; }
 
     /**
      * Plays a sound effect if sound is enabled in settings.
-     * Audio runs on a short daemon thread so the EDT/game loop is never
+     * Audio runs on a daemon thread pool so the EDT/game loop is never
      * blocked by playback (and overlapping sounds do not queue up).
      */
     public synchronized void play(Sound sound) {
@@ -92,7 +105,7 @@ public final class SoundManager {
         if (sound == Sound.HIT && !throttleOk(sound, THROTTLE_HIT_MS)) {
             return;
         }
-        Thread worker = new Thread(() -> {
+        soundPool.execute(() -> {
             try {
                 byte[] data = loadedClips.get(sound);
                 if (data != null) {
@@ -107,9 +120,7 @@ public final class SoundManager {
             } catch (Throwable audioProblem) {
                 // Never let audio issues reach the game loop.
             }
-        }, "sfx-" + sound.name().toLowerCase());
-        worker.setDaemon(true);
-        worker.start();
+        });
     }
 
     /** Throttle guard: true when enough time passed since the last play. */
@@ -122,34 +133,44 @@ public final class SoundManager {
         lastPlayed.put(sound, now);
         return true;
     }
+
     // ------------------------------------------------------------------
     // Background music (optional file: resources/sounds/music.wav)
     // ------------------------------------------------------------------
 
     /** Starts looping background music when enabled and available. */
-    public void startMusic() {
+    public synchronized void startMusic() {
         if (!GameConfig.getInstance().isMusicEnabled() || musicPlaying) {
             return;
         }
+        stopMusic();
         try {
-            byte[] data = loadResource("/sounds/music.wav");
+            byte[] data = (musicData != null) ? musicData : loadResource("/sounds/music.wav");
             if (data == null) {
-                return; // no music file -> silent, but no crash
+                byte[] pcm = SoundSynth.renderMusicLoop();
+                if (pcm != null) {
+                    data = SoundSynth.toWav(pcm);
+                }
+            }
+            if (data == null) {
+                return; // no music available -> silent, but no crash
             }
             musicClip = AudioSystem.getClip();
             musicClip.open(AudioSystem.getAudioInputStream(new ByteArrayInputStream(data)));
             if (musicClip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
-                ((FloatControl) musicClip.getControl(FloatControl.Type.MASTER_GAIN)).setValue(-16.0f);
+                FloatControl fc = (FloatControl) musicClip.getControl(FloatControl.Type.MASTER_GAIN);
+                fc.setValue(Math.max(fc.getMinimum(), Math.min(fc.getMaximum(), -14.0f)));
             }
             musicClip.loop(Clip.LOOP_CONTINUOUSLY);
             musicPlaying = true;
         } catch (Throwable audioProblem) {
             musicPlaying = false;
+            stopMusic();
         }
     }
 
     /** Stops the background music (if running). */
-    public void stopMusic() {
+    public synchronized void stopMusic() {
         try {
             if (musicClip != null) {
                 musicClip.stop();
@@ -163,7 +184,7 @@ public final class SoundManager {
         }
     }
 
-    public boolean isMusicPlaying() { return musicPlaying; }
+    public synchronized boolean isMusicPlaying() { return musicPlaying; }
 
     // ------------------------------------------------------------------
     // Internals
@@ -195,16 +216,22 @@ public final class SoundManager {
         }
     }
 
-    /** Blocks until the short clip finished (runs on the caller thread). */
+    /** Blocks until the short clip finishes playing (runs on caller thread). */
     private void playClipOnce(Clip clip) throws Exception {
         if (clip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
-            ((FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN)).setValue(-10.0f);
+            FloatControl fc = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
+            fc.setValue(Math.max(fc.getMinimum(), Math.min(fc.getMaximum(), -4.0f)));
         }
+        CountDownLatch latch = new CountDownLatch(1);
+        clip.addLineListener(event -> {
+            if (event.getType() == LineEvent.Type.STOP) {
+                latch.countDown();
+            }
+        });
         clip.start();
-        long deadline = System.currentTimeMillis() + 3000;
-        while (clip.isRunning() && System.currentTimeMillis() < deadline) {
-            Thread.sleep(10);
-        }
+        long maxWaitMs = Math.max(500, (clip.getMicrosecondLength() / 1000) + 300);
+        latch.await(Math.min(4000, maxWaitMs), TimeUnit.MILLISECONDS);
+        clip.stop();
         clip.close();
     }
 
