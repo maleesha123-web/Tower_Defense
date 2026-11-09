@@ -130,11 +130,12 @@ public class MathChallengeOverlay extends JPanel {
 
     /** Shows a loading state while the question is being fetched. */
     public void showLoading() {
-        modeBadge.setText("FETCHING QUESTION...");
-        modeBadge.setForeground(Theme.TEXT_DIM);
+        modeBadge.setText("API MODE  -  Fish Game API (marcconrad.com)");
+        modeBadge.setForeground(Theme.SUCCESS);
         warningLabel.setVisible(false);
         promptLabel.setText(" ");
         imagePanel.setImage(null);
+        loadingLabel.setText("Loading question from API...");
         loadingLabel.setVisible(true);
         answerField.setText("");
         answerField.setEnabled(false);
@@ -149,10 +150,8 @@ public class MathChallengeOverlay extends JPanel {
      * @param warning  optional API-failure notice (shown when non-null)
      */
     public void showQuestion(Question question, String warning) {
-        boolean api = !question.isFallback();
-        modeBadge.setText(api ? "API MODE  -  Fish Game API (marcconrad.com)"
-                : "OFFLINE FALLBACK MODE  -  local question, NOT from the API");
-        modeBadge.setForeground(api ? Theme.SUCCESS : Theme.WARNING);
+        modeBadge.setText("API MODE  -  Fish Game API (marcconrad.com)");
+        modeBadge.setForeground(Theme.SUCCESS);
 
         if (warning != null && !warning.isBlank()) {
             warningLabel.setText(warning);
@@ -168,6 +167,22 @@ public class MathChallengeOverlay extends JPanel {
         answerField.setEnabled(true);
         submitButton.setEnabled(true);
         answerField.requestFocusInWindow();
+    }
+
+    /** Shows an error message while retrying connection to the API. */
+    public void showError(String message) {
+        modeBadge.setText("API MODE  -  Fish Game API (marcconrad.com)");
+        modeBadge.setForeground(Theme.WARNING);
+        warningLabel.setText(message != null ? message : "Unable to reach Fish Game API.");
+        warningLabel.setVisible(true);
+        loadingLabel.setText("Retrying connection to Fish Game API...");
+        loadingLabel.setVisible(true);
+        promptLabel.setText(" ");
+        imagePanel.setImage(null);
+        answerField.setText("");
+        answerField.setEnabled(false);
+        submitButton.setEnabled(false);
+        timerLabel.setText("Time: --");
     }
 
     /** Updates the countdown label (called every frame). */
@@ -227,7 +242,7 @@ public class MathChallengeOverlay extends JPanel {
             } else {
                 g2.setColor(Theme.TEXT_DIM);
                 g2.setFont(Theme.bodyFont());
-                String hint = "Text question - solve it and type your answer below.";
+                String hint = "Loading fish picture from API...";
                 int tw = g2.getFontMetrics().stringWidth(hint);
                 g2.drawString(hint, (w - tw) / 2, h / 2);
             }

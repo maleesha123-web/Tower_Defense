@@ -19,14 +19,14 @@ package com.mathtowerdefense.api;
 public final class ApiConfig {
 
     /** Official base URL exactly as published in the documentation. */
-    public static final String DEFAULT_BASE_URL = "http://marcconrad.com/uob/fish/api.php";
+    public static final String DEFAULT_BASE_URL = "https://marcconrad.com/uob/fish/api.php";
 
     /** Environment variable names (see .env.example). */
     public static final String ENV_API_KEY = "FISH_API_KEY";
     public static final String ENV_BASE_URL = "MTD_FISH_API_URL";
 
-    private static final int DEFAULT_CONNECT_TIMEOUT_MS = 3000;
-    private static final int DEFAULT_READ_TIMEOUT_MS = 4000;
+    private static final int DEFAULT_CONNECT_TIMEOUT_MS = 6000;
+    private static final int DEFAULT_READ_TIMEOUT_MS = 6000;
 
     private static ApiConfig instance;
 

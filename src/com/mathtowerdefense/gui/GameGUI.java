@@ -446,10 +446,15 @@ public class GameGUI extends JPanel implements GameEngine.Listener {
             protected void done() {
                 try {
                     QuestionManager.FetchResult result = get();
-                    deliverIfCurrent(engine, result.getQuestion(), result.getWarning());
+                    if (result != null && result.getQuestion() != null) {
+                        deliverIfCurrent(engine, result.getQuestion(), result.getWarning());
+                    } else if (challenge != null && engine.isChallengeOpen()) {
+                        String warn = (result != null && result.getWarning() != null)
+                                ? result.getWarning()
+                                : "Connecting to Fish Game API...";
+                        challenge.showError(warn);
+                    }
                 } catch (Exception problem) {
-                    // Absolute safety net: engine has its own load timeout,
-                    // but never leave the worker's exception unhandled.
                     deliverIfCurrent(engine, null, null);
                 } finally {
                     fetchingQuestion = false;
@@ -505,9 +510,8 @@ public class GameGUI extends JPanel implements GameEngine.Listener {
             statusL.setForeground(Theme.TEXT_DIM);
         }
 
-        boolean offline = engine.getQuestionManager().isOffline();
         modeL.setText(engine.getQuestionManager().getModeLabel());
-        modeL.setForeground(offline ? Theme.WARNING : Theme.SUCCESS);
+        modeL.setForeground(Theme.SUCCESS);
     }
 
     /** Drives the board/challenge/pause card switching from engine state. */

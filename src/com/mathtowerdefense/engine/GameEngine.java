@@ -14,7 +14,6 @@ import com.mathtowerdefense.managers.QuestionManager;
 import com.mathtowerdefense.managers.ScoreManager;
 import com.mathtowerdefense.managers.TowerManager;
 import com.mathtowerdefense.managers.WaveManager;
-import com.mathtowerdefense.api.LocalQuestionGenerator;
 
 import java.awt.Color;
 import java.util.ArrayList;
@@ -397,8 +396,11 @@ public class GameEngine {
         if (currentQuestion == null) {
             questionWait += dt;
             if (questionWait >= QUESTION_LOAD_TIMEOUT) {
-                // Absolute safety net: never hang on a stuck fetch.
-                useLocalFallback("Question service did not respond in time.");
+                // Retry requesting question from API (only API questions, no local questions)
+                questionWait = 0;
+                if (listener != null) {
+                    listener.onMathChallengeNeeded();
+                }
             }
             return;
         }
@@ -429,13 +431,6 @@ public class GameEngine {
             preloadedQuestion = question;
             preloadedWarning = warning;
         }
-    }
-
-    /** Forces an honest local question (clearly marked, never as API). */
-    private void useLocalFallback(String reason) {
-        int level = waveManager.getCurrentWaveNumber();
-        Question local = new LocalQuestionGenerator().generate(Math.max(1, level));
-        deliverQuestion(local, reason + " Using a local offline question.");
     }
 
     /**

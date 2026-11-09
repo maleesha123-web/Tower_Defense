@@ -479,19 +479,27 @@ public final class TestRunner {
     private static void testGameSimulation() {
         section("Headless gameplay simulation");
         final boolean[] ended = { false };
+        final GameEngine[] engineRef = new GameEngine[1];
         GameEngine engine = new GameEngine("SimPlayer", GameConfig.DIFFICULTY_EASY,
                 new GameEngine.Listener() {
                     @Override
                     public void onNotice(String message, boolean positive) { }
 
                     @Override
-                    public void onMathChallengeNeeded() { }
+                    public void onMathChallengeNeeded() {
+                        if (engineRef[0] != null) {
+                            engineRef[0].deliverQuestion(new Question(
+                                    "How many fish are in the picture?", "5",
+                                    Question.Source.API, null, "https://marcconrad.com/uob/fish/sample.png"), null);
+                        }
+                    }
 
                     @Override
                     public void onGameEnded(boolean victory) {
                         ended[0] = true;
                     }
                 });
+        engineRef[0] = engine;
 
         // Build two towers up front so the simulation can score kills.
         engine.getPlayer().addCoins(1000);
