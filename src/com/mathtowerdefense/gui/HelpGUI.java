@@ -44,20 +44,14 @@ public class HelpGUI extends JPanel {
 
             MATH CHALLENGES (the heart of the game)
             Every so often a MATH CHALLENGE appears and the battle pauses:
-            - API MODE shows a picture from the Fish Game API - count the
-              fish and type the number. The mode badge always tells you
-              whether the question came from the API or from the offline
-              fallback generator.
+            - A picture from the Fish Game API is shown - count the fish
+              and type the number.
             - Correct answer: +50 score, +15 coins, combo increases, and your
               towers get MATH POWER (x1.5 damage) for 12 seconds!
             - Wrong answer or timeout (10 seconds): -25 score, -10 coins,
               -5 base HP, combo resets and towers are WEAKENED (x0.5 damage)
               for 8 seconds.
             - Combo bonuses: 3 in a row +100, 5 in a row +250, 10 in a row +600.
-
-            If the question service is unreachable the game switches to
-            OFFLINE FALLBACK MODE and generates arithmetic questions locally -
-            it never pretends a local question came from the API.
 
 
             ENEMIES
