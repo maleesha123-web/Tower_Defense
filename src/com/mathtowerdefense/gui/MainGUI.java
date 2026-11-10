@@ -97,6 +97,7 @@ public class MainGUI extends JFrame {
             case CARD_MENU -> menuGUI.refresh();
             case CARD_PROFILE -> profileGUI.refresh();
             case CARD_LEADERBOARD -> leaderboardGUI.refresh();
+            case CARD_SETTINGS -> settingsGUI.refresh();
             case CARD_GAME -> gameGUI.prepare();
             default -> { /* screens without refresh logic */ }
         }
