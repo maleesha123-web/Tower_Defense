@@ -564,7 +564,7 @@ public final class TestRunner {
             threw = true;
         }
         check("availability probe never throws", !threw);
-        System.out.println("        MySQL reachable here: " + available);
+        System.out.println("        Database (MongoDB) reachable here: " + available);
         check("friendly unavailable message",
                 com.mathtowerdefense.database.DatabaseConnection.unavailableMessage() != null
                 && !com.mathtowerdefense.database.DatabaseConnection.unavailableMessage().isEmpty());

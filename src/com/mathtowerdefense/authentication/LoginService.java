@@ -31,32 +31,32 @@ public final class LoginService {
      *
      * @return an error message, or {@code null} when the input is valid
      */
-    public static String validate(String username, String password) {
-        if (username == null || username.trim().isEmpty()) {
-            return "Username must not be empty.";
+    public static String validate(String identifier, String password) {
+        if (identifier == null || identifier.trim().isEmpty()) {
+            return "Username or email must not be empty.";
         }
         if (password == null || password.isEmpty()) {
             return "Password must not be empty.";
         }
-        if (username.trim().length() > 20) {
-            return "Username must be 20 characters or fewer.";
+        if (identifier.trim().length() > 120) {
+            return "Username or email must be 120 characters or fewer.";
         }
         return null;
     }
 
     /**
-     * Attempts to sign a user in.
+     * Attempts to sign a user in using username OR email address.
      *
      * @return a successful result with the user, or a failure with a friendly,
      *         stack-trace-free message (invalid credentials, database offline, ...)
      */
-    public Result login(String username, String password) {
-        String inputError = validate(username, password);
+    public Result login(String identifier, String password) {
+        String inputError = validate(identifier, password);
         if (inputError != null) {
             return Result.failure(inputError);
         }
         try {
-            User user = userDAO.findByUsername(username.trim()).orElse(null);
+            User user = userDAO.findByUsernameOrEmail(identifier.trim()).orElse(null);
             // Same message for "no such user" and "wrong password" so the
             // endpoint cannot be used to enumerate accounts.
             if (user == null || !hasher.verify(password, user.getPasswordHash())) {

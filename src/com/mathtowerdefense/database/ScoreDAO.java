@@ -2,104 +2,141 @@ package com.mathtowerdefense.database;
 
 import com.mathtowerdefense.models.PlayerStats;
 import com.mathtowerdefense.models.Score;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.model.Filters;
+import org.bson.Document;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Date;
 import java.util.Optional;
 
 /**
- * Data access for the {@code scores} and {@code player_stats} tables.
+ * Data access for the {@code scores} and {@code player_stats} collections in MongoDB.
  * Handles both persisting a finished game and reading lifetime statistics.
  */
 public class ScoreDAO {
 
-    /** Inserts one finished game (row of the {@code scores} table). */
+    private MongoCollection<Document> scoresCollection() {
+        return DatabaseConnection.getDatabase().getCollection("scores");
+    }
+
+    private MongoCollection<Document> statsCollection() {
+        return DatabaseConnection.getDatabase().getCollection("player_stats");
+    }
+
+    private MongoCollection<Document> usersCollection() {
+        return DatabaseConnection.getDatabase().getCollection("users");
+    }
+
+    /** Inserts one finished game (document in the {@code scores} collection). */
     public boolean insertScore(Score score) throws SQLException {
-        String sql = "INSERT INTO scores (user_id, score, level, wave, enemies_defeated) VALUES (?, ?, ?, ?, ?)";
-        try (Connection c = DatabaseConnection.getConnection();
-             PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setInt(1, score.getUserId());
-            ps.setInt(2, score.getScore());
-            ps.setInt(3, score.getLevel());
-            ps.setInt(4, score.getWave());
-            ps.setInt(5, score.getEnemiesDefeated());
-            return ps.executeUpdate() == 1;
+        try {
+            int nextId = DatabaseConnection.getNextSequence("scores");
+
+            String username = score.getUsername();
+            if (username == null || username.isBlank()) {
+                Document userDoc = usersCollection().find(Filters.eq("id", score.getUserId())).first();
+                if (userDoc != null) {
+                    username = userDoc.getString("username");
+                }
+            }
+            if (username == null) {
+                username = "Player";
+            }
+
+            Document doc = new Document("id", nextId)
+                    .append("user_id", score.getUserId())
+                    .append("username", username)
+                    .append("score", score.getScore())
+                    .append("level", score.getLevel())
+                    .append("wave", score.getWave())
+                    .append("enemies_defeated", score.getEnemiesDefeated())
+                    .append("created_at", new Date());
+
+            scoresCollection().insertOne(doc);
+            return true;
+        } catch (Exception e) {
+            throw new SQLException("MongoDB error inserting score: " + e.getMessage(), e);
         }
     }
 
     /**
      * Updates (or creates) the lifetime statistics of a user after a game.
-     * High scores use GREATEST() so only genuine improvements are stored.
+     * High scores only update on genuine improvements.
      */
     public void updateStats(int userId, int score, int wave, int correct, int incorrect,
                             int enemiesDefeated) throws SQLException {
-        String update = "UPDATE player_stats SET games_played = games_played + 1, "
-                + "highest_score = GREATEST(highest_score, ?), highest_wave = GREATEST(highest_wave, ?), "
-                + "correct_answers = correct_answers + ?, incorrect_answers = incorrect_answers + ?, "
-                + "total_enemies_defeated = total_enemies_defeated + ? WHERE user_id = ?";
-        try (Connection c = DatabaseConnection.getConnection();
-             PreparedStatement ps = c.prepareStatement(update)) {
-            ps.setInt(1, score);
-            ps.setInt(2, wave);
-            ps.setInt(3, correct);
-            ps.setInt(4, incorrect);
-            ps.setInt(5, enemiesDefeated);
-            ps.setInt(6, userId);
+        try {
+            Document existing = statsCollection().find(Filters.eq("user_id", userId)).first();
+            if (existing == null) {
+                int nextId = DatabaseConnection.getNextSequence("player_stats");
+                Document newStats = new Document("id", nextId)
+                        .append("user_id", userId)
+                        .append("games_played", 1)
+                        .append("highest_score", score)
+                        .append("highest_wave", wave)
+                        .append("correct_answers", correct)
+                        .append("incorrect_answers", incorrect)
+                        .append("total_enemies_defeated", enemiesDefeated);
+                statsCollection().insertOne(newStats);
+            } else {
+                int prevGames = getInt(existing, "games_played", 0);
+                int prevScore = getInt(existing, "highest_score", 0);
+                int prevWave = getInt(existing, "highest_wave", 0);
+                int prevCorrect = getInt(existing, "correct_answers", 0);
+                int prevIncorrect = getInt(existing, "incorrect_answers", 0);
+                int prevEnemies = getInt(existing, "total_enemies_defeated", 0);
 
-            if (ps.executeUpdate() == 0) {
-                // First game for this user -> create the stats row.
-                String insert = "INSERT INTO player_stats (user_id, games_played, highest_score, "
-                        + "highest_wave, correct_answers, incorrect_answers, total_enemies_defeated) "
-                        + "VALUES (?, 1, ?, ?, ?, ?, ?)";
-                try (PreparedStatement ins = c.prepareStatement(insert)) {
-                    ins.setInt(1, userId);
-                    ins.setInt(2, score);
-                    ins.setInt(3, wave);
-                    ins.setInt(4, correct);
-                    ins.setInt(5, incorrect);
-                    ins.setInt(6, enemiesDefeated);
-                    ins.executeUpdate();
-                }
+                Document updated = new Document("$set", new Document()
+                        .append("games_played", prevGames + 1)
+                        .append("highest_score", Math.max(prevScore, score))
+                        .append("highest_wave", Math.max(prevWave, wave))
+                        .append("correct_answers", prevCorrect + correct)
+                        .append("incorrect_answers", prevIncorrect + incorrect)
+                        .append("total_enemies_defeated", prevEnemies + enemiesDefeated));
+
+                statsCollection().updateOne(Filters.eq("user_id", userId), updated);
             }
+        } catch (Exception e) {
+            throw new SQLException("MongoDB error updating player stats: " + e.getMessage(), e);
         }
     }
 
-    /** Convenience: persists the score row and the statistics in one call. */
+    /** Convenience: persists the score document and the statistics in one call. */
     public void saveGameResult(int userId, int score, int level, int wave,
                                int correct, int incorrect, int enemiesDefeated) throws SQLException {
         insertScore(Score.unpersisted(userId, null, score, level, wave, enemiesDefeated));
         updateStats(userId, score, wave, correct, incorrect, enemiesDefeated);
     }
 
-    /** @return the player's lifetime statistics, or empty when no row exists yet */
+    /** @return the player's lifetime statistics, or empty when no document exists yet */
     public Optional<PlayerStats> findStats(int userId) throws SQLException {
-        String sql = "SELECT id, user_id, games_played, highest_score, highest_wave, "
-                + "correct_answers, incorrect_answers, total_enemies_defeated "
-                + "FROM player_stats WHERE user_id = ?";
-        try (Connection c = DatabaseConnection.getConnection();
-             PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setInt(1, userId);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (!rs.next()) {
-                    return Optional.empty();
-                }
-                return Optional.of(new PlayerStats(
-                        rs.getInt("id"),
-                        rs.getInt("user_id"),
-                        rs.getInt("games_played"),
-                        rs.getInt("highest_score"),
-                        rs.getInt("highest_wave"),
-                        rs.getInt("correct_answers"),
-                        rs.getInt("incorrect_answers"),
-                        rs.getInt("total_enemies_defeated")));
+        try {
+            Document doc = statsCollection().find(Filters.eq("user_id", userId)).first();
+            if (doc == null) {
+                return Optional.empty();
             }
+            return Optional.of(new PlayerStats(
+                    getInt(doc, "id", 0),
+                    getInt(doc, "user_id", userId),
+                    getInt(doc, "games_played", 0),
+                    getInt(doc, "highest_score", 0),
+                    getInt(doc, "highest_wave", 0),
+                    getInt(doc, "correct_answers", 0),
+                    getInt(doc, "incorrect_answers", 0),
+                    getInt(doc, "total_enemies_defeated", 0)));
+        } catch (Exception e) {
+            throw new SQLException("MongoDB error finding player stats: " + e.getMessage(), e);
         }
     }
 
-    /** @return a zeroed stats object when the row does not exist (new account) */
+    /** @return a zeroed stats object when the document does not exist (new account) */
     public PlayerStats getStatsOrEmpty(int userId) throws SQLException {
         return findStats(userId).orElseGet(() -> PlayerStats.empty(userId));
+    }
+
+    private static int getInt(Document doc, String field, int fallback) {
+        Object val = doc.get(field);
+        return val instanceof Number n ? n.intValue() : fallback;
     }
 }

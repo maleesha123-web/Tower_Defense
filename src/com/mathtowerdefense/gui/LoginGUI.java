@@ -63,7 +63,7 @@ public class LoginGUI extends JPanel {
         form.add(subtitle);
         form.add(Box.createVerticalStrut(30));
 
-        form.add(labeled("Username", usernameField));
+        form.add(labeled("Username or Email", usernameField));
         form.add(Box.createVerticalStrut(14));
         form.add(labeled("Password", passwordField));
         form.add(Box.createVerticalStrut(10));
