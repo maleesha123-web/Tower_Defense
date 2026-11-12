@@ -1,0 +1,21 @@
+# Build/runtime artifacts - regenerate with the commands in README.md
+bin/
+sources.txt
+gui-out.log
+gui-err.log
+*.class
+
+# MongoDB database files
+mongodb_data/
+*.lock
+
+# Node modules
+node_modules/
+
+# Environment variables
+.env
+.env.local
+
+# Build files
+dist/
+build/

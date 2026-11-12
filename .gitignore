@@ -1,0 +1,7 @@
+﻿mongodb_data/
+*.lock
+node_modules/
+.env
+.env.local
+dist/
+build/
