@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ﻿mongodb_data/
 *.lock
 node_modules/
@@ -5,3 +6,11 @@ node_modules/
 .env.local
 dist/
 build/
+=======
+# Build/runtime artifacts - regenerate with the commands in README.md
+bin/
+sources.txt
+gui-out.log
+gui-err.log
+*.class
+>>>>>>> 3b2f31a34d90bfdde91922604030906973ee41c7
