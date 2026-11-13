@@ -1,7 +1,6 @@
 package com.mathtowerdefense.tests;
 
 import com.mathtowerdefense.api.FishGameAPI;
-import com.mathtowerdefense.api.LocalQuestionGenerator;
 import com.mathtowerdefense.api.Question;
 import com.mathtowerdefense.authentication.LoginService;
 import com.mathtowerdefense.authentication.PasswordHasher;
@@ -54,7 +53,6 @@ public final class TestRunner {
         testMathBoostTowerHook();
         testWaveProgression();
         testAnswerValidation();
-        testLocalGenerator();
         testApiJsonParsing();
         testPlacementValidation();
         testGameSimulation();
@@ -388,33 +386,6 @@ public final class TestRunner {
         check("null input incorrect", !apiStyle.isCorrect(null));
         check("text input incorrect", !apiStyle.isCorrect("nine"));
         check("question is API-sourced", !apiStyle.isFallback());
-
-        Question local = new Question("15 + 27 = ?", "42",
-                Question.Source.LOCAL_FALLBACK, null, null);
-        check("fallback question marked as fallback", local.isFallback());
-        check("fallback arithmetic correct", local.isCorrect("42"));
-    }
-
-    private static void testLocalGenerator() {
-        section("Offline fallback generator");
-        LocalQuestionGenerator gen = new LocalQuestionGenerator();
-        boolean allValid = true;
-        boolean anyNonArithmetic = false;
-        for (int i = 0; i < 50; i++) {
-            Question q = gen.generate(1 + (i % 5));
-            if (q == null || !q.isFallback() || q.getAnswer() == null
-                    || !q.getPrompt().contains("=")) {
-                allValid = false;
-                continue;
-            }
-            try {
-                Integer.parseInt(q.getAnswer());
-            } catch (NumberFormatException e) {
-                anyNonArithmetic = true;
-            }
-        }
-        check("50 generated questions are well-formed", allValid);
-        check("all answers are integers", !anyNonArithmetic);
     }
 
     private static void testApiJsonParsing() {

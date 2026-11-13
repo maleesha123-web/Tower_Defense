@@ -5,20 +5,17 @@ import java.awt.image.BufferedImage;
 /**
  * A single mathematics challenge shown to the player.
  *
- * A question originates either from the Fish Game API (a picture that asks the
- * player to count the fish in it - see https://marcconrad.com/uob/fish/) or
- * from the local offline fallback generator. The {@link Source} makes the
- * origin explicit so the UI can clearly distinguish API MODE from OFFLINE
- * FALLBACK MODE - a local question never pretends to come from the API.
+ * All questions originate exclusively from the Fish Game API (a picture that asks the
+ * player to count the fish in it - see https://marcconrad.com/uob/fish/).
  */
 public final class Question {
 
-    public enum Source { API, LOCAL_FALLBACK }
+    public enum Source { API }
 
-    private final String prompt;        // e.g. "How many fish are in the picture?" or "15 + 27 = ?"
+    private final String prompt;        // e.g. "How many fish are in the picture?"
     private final String answer;        // canonical answer as text (the API returns numbers)
     private final Source source;
-    private final BufferedImage image;  // question image, may be null (text-only fallback questions)
+    private final BufferedImage image;  // question image
     private final String imageUrl;      // original image URL when provided by the API, may be null
 
     public Question(String prompt, String answer, Source source, BufferedImage image, String imageUrl) {
@@ -30,9 +27,13 @@ public final class Question {
         }
         this.prompt = prompt;
         this.answer = answer.trim();
-        this.source = source;
+        this.source = source != null ? source : Source.API;
         this.image = image;
         this.imageUrl = imageUrl;
+    }
+
+    public Question(String prompt, String answer, BufferedImage image, String imageUrl) {
+        this(prompt, answer, Source.API, image, imageUrl);
     }
 
     public String getPrompt() { return prompt; }
@@ -41,8 +42,8 @@ public final class Question {
 
     public Source getSource() { return source; }
 
-    /** True when this question was produced by the local offline generator. */
-    public boolean isFallback() { return source == Source.LOCAL_FALLBACK; }
+    /** Always false: only real API questions are used. */
+    public boolean isFallback() { return false; }
 
     /** @return the question image (API questions) or {@code null} for text-only questions. */
     public BufferedImage getImage() { return image; }

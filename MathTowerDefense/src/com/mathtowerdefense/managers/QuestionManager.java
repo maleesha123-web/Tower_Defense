@@ -2,7 +2,6 @@ package com.mathtowerdefense.managers;
 
 import com.mathtowerdefense.api.APIResponse;
 import com.mathtowerdefense.api.FishGameAPI;
-import com.mathtowerdefense.api.LocalQuestionGenerator;
 import com.mathtowerdefense.api.Question;
 
 /**
@@ -13,7 +12,6 @@ import com.mathtowerdefense.api.Question;
 public class QuestionManager {
 
     private final FishGameAPI api;
-    private final LocalQuestionGenerator fallback;
 
     private String lastError;
     private int apiFailures = 0;
@@ -21,12 +19,11 @@ public class QuestionManager {
     private int apiServed = 0;
 
     public QuestionManager() {
-        this(new FishGameAPI(), new LocalQuestionGenerator());
+        this(new FishGameAPI());
     }
 
-    public QuestionManager(FishGameAPI api, LocalQuestionGenerator fallback) {
+    public QuestionManager(FishGameAPI api) {
         this.api = api;
-        this.fallback = fallback;
     }
 
     /** Result of a fetch: the question plus where it came from + warning. */
