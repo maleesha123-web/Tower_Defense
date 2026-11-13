@@ -22,6 +22,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.KeyStroke;
 import javax.swing.SwingWorker;
+import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
@@ -30,12 +31,14 @@ import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.GridBagLayout;
 import java.awt.KeyEventDispatcher;
 import java.awt.KeyboardFocusManager;
 import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import java.awt.geom.Point2D;
+import java.awt.geom.RoundRectangle2D;
 import java.util.EnumMap;
 import java.util.Map;
 
@@ -79,7 +82,16 @@ public class GameGUI extends JPanel implements GameEngine.Listener {
     private final JPanel centerCards = new JPanel(centerLayout);
     private final GameBoardPanel board;
     private final MathChallengeOverlay challenge = new MathChallengeOverlay();
-    private final JPanel pausePanel = new JPanel(new BorderLayout());
+    private final JPanel pausePanel = new JPanel(new GridBagLayout()) {
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            Theme.paintCoverBackground(g2, Theme.getMenuBackground(), getWidth(), getHeight(), 0.50f);
+            g2.dispose();
+        }
+    };
 
     // ---- right-hand shop ----
     private final Map<TowerType, JButton> shopButtons = new EnumMap<>(TowerType.class);
@@ -125,15 +137,36 @@ public class GameGUI extends JPanel implements GameEngine.Listener {
         centerCards.add(board, CARD_BOARD);
         centerCards.add(challenge, CARD_CHALLENGE);
 
-        // Pause overlay: centred card with RESUME / RESTART / MAIN MENU.
-        pausePanel.setBackground(new Color(8, 10, 16, 220));
-        JPanel pauseBox = Theme.panel();
+        // Pause overlay: centered card with background image and centered action buttons.
+        pausePanel.setOpaque(false);
+
+        JPanel pauseBox = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                // Semi-translucent dark panel background
+                g2.setColor(new Color(18, 23, 34, 238));
+                g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 22, 22));
+
+                // Subtle glowing accent border
+                g2.setColor(new Color(64, 156, 255, 80));
+                g2.setStroke(new BasicStroke(1.5f));
+                g2.draw(new RoundRectangle2D.Double(1, 1, getWidth() - 2, getHeight() - 2, 22, 22));
+
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        pauseBox.setOpaque(false);
         pauseBox.setLayout(new javax.swing.BoxLayout(pauseBox, javax.swing.BoxLayout.Y_AXIS));
-        Theme.pad(pauseBox, 40, 60, 40, 60);
+        pauseBox.setPreferredSize(new Dimension(420, 360));
+        Theme.pad(pauseBox, 32, 40, 32, 40);
 
         JLabel pausedTitle = new JLabel("PAUSED");
-        pausedTitle.setFont(Theme.titleFont());
-        pausedTitle.setForeground(Theme.WARNING);
+        pausedTitle.setFont(Theme.titleFont().deriveFont(Font.BOLD, 36f));
+        pausedTitle.setForeground(Theme.GOLD);
         pausedTitle.setAlignmentX(CENTER_ALIGNMENT);
         pauseBox.add(pausedTitle);
         pauseBox.add(strut(6));
@@ -143,27 +176,27 @@ public class GameGUI extends JPanel implements GameEngine.Listener {
         pauseSubtitle.setForeground(Theme.TEXT_DIM);
         pauseSubtitle.setAlignmentX(CENTER_ALIGNMENT);
         pauseBox.add(pauseSubtitle);
-        pauseBox.add(strut(22));
+        pauseBox.add(strut(28));
 
         JButton resume = Theme.primaryButton("RESUME (Esc / P)");
-        resume.setMaximumSize(new Dimension(260, 46));
+        resume.setMaximumSize(new Dimension(280, 48));
         resume.setAlignmentX(CENTER_ALIGNMENT);
         resume.addActionListener(e -> resumeGame());
         pauseBox.add(resume);
-        pauseBox.add(strut(12));
+        pauseBox.add(strut(14));
 
         JButton restart = Theme.button("RESTART", Theme.PANEL_LIGHT);
-        restart.setMaximumSize(new Dimension(260, 46));
+        restart.setMaximumSize(new Dimension(280, 48));
         restart.setAlignmentX(CENTER_ALIGNMENT);
         restart.addActionListener(e -> {
             SoundManager.getInstance().play(SoundManager.Sound.CLICK);
             startNewGame();
         });
         pauseBox.add(restart);
-        pauseBox.add(strut(12));
+        pauseBox.add(strut(14));
 
-        JButton toMenu = Theme.button("MAIN MENU", new Color(120, 40, 40));
-        toMenu.setMaximumSize(new Dimension(260, 46));
+        JButton toMenu = Theme.button("MAIN MENU", new Color(130, 42, 42));
+        toMenu.setMaximumSize(new Dimension(280, 48));
         toMenu.setAlignmentX(CENTER_ALIGNMENT);
         toMenu.addActionListener(e -> {
             SoundManager.getInstance().play(SoundManager.Sound.CLICK);
@@ -172,11 +205,7 @@ public class GameGUI extends JPanel implements GameEngine.Listener {
         });
         pauseBox.add(toMenu);
 
-        JPanel centre = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        centre.setOpaque(false);
-        centre.add(pauseBox);
-        pausePanel.add(centre, BorderLayout.CENTER);
-
+        pausePanel.add(pauseBox);
         centerCards.add(pausePanel, CARD_PAUSE);
     }
 
