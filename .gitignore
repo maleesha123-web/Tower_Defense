@@ -14,3 +14,5 @@ gui-out.log
 gui-err.log
 *.class
 >>>>>>> 3b2f31a34d90bfdde91922604030906973ee41c7
+
+mongodb_data/

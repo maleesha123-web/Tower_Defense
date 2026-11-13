@@ -53,11 +53,13 @@ public class GameBoardPanel extends JPanel {
         this.shopSelection = shopSelection;
         this.mapClick = mapClick;
         setBackground(Theme.BG);
+        setFocusable(true);
         setCursor(Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR));
 
         addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
+                requestFocusInWindow();
                 Point2D.Double p = toMapCoords(e.getX(), e.getY());
                 mapClick.accept(p);
             }

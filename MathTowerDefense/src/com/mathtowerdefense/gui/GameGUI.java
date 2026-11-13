@@ -13,7 +13,9 @@ import com.mathtowerdefense.entities.TowerType;
 import com.mathtowerdefense.managers.QuestionManager;
 
 import javax.swing.AbstractAction;
+import javax.swing.Action;
 import javax.swing.BorderFactory;
+import javax.swing.InputMap;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -28,6 +30,8 @@ import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.KeyEventDispatcher;
+import java.awt.KeyboardFocusManager;
 import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
@@ -68,6 +72,7 @@ public class GameGUI extends JPanel implements GameEngine.Listener {
     private final JLabel statusL = hudLabel();
     private final JLabel modeL = hudLabel();
     private final HpBar hpBar = new HpBar();
+    private final JButton pauseBtn = Theme.button("PAUSE", Theme.PANEL_LIGHT);
 
     // ---- centre cards ----
     private final CardLayout centerLayout = new CardLayout();
@@ -131,17 +136,19 @@ public class GameGUI extends JPanel implements GameEngine.Listener {
         pausedTitle.setForeground(Theme.WARNING);
         pausedTitle.setAlignmentX(CENTER_ALIGNMENT);
         pauseBox.add(pausedTitle);
-        pauseBox.add(strut(24));
+        pauseBox.add(strut(6));
 
-        JButton resume = Theme.primaryButton("RESUME");
+        JLabel pauseSubtitle = new JLabel("Press ESC or P to Resume");
+        pauseSubtitle.setFont(Theme.bodyFont().deriveFont(Font.BOLD, 13.5f));
+        pauseSubtitle.setForeground(Theme.TEXT_DIM);
+        pauseSubtitle.setAlignmentX(CENTER_ALIGNMENT);
+        pauseBox.add(pauseSubtitle);
+        pauseBox.add(strut(22));
+
+        JButton resume = Theme.primaryButton("RESUME (Esc / P)");
         resume.setMaximumSize(new Dimension(260, 46));
         resume.setAlignmentX(CENTER_ALIGNMENT);
-        resume.addActionListener(e -> {
-            SoundManager.getInstance().play(SoundManager.Sound.CLICK);
-            if (game != null) {
-                game.getEngine().resume();
-            }
-        });
+        resume.addActionListener(e -> resumeGame());
         pauseBox.add(resume);
         pauseBox.add(strut(12));
 
@@ -194,14 +201,9 @@ public class GameGUI extends JPanel implements GameEngine.Listener {
         comboL.setForeground(Theme.SUCCESS);
         modeL.setForeground(Theme.SUCCESS);
 
-        JButton pauseBtn = Theme.button("PAUSE", Theme.PANEL_LIGHT);
-        pauseBtn.setPreferredSize(new Dimension(100, 34));
-        pauseBtn.addActionListener(e -> {
-            SoundManager.getInstance().play(SoundManager.Sound.CLICK);
-            if (game != null) {
-                game.getEngine().togglePause();
-            }
-        });
+        pauseBtn.setPreferredSize(new Dimension(108, 34));
+        pauseBtn.setToolTipText("Pause or resume gameplay (Esc / P)");
+        pauseBtn.addActionListener(e -> togglePause());
 
         hud.add(scoreL);
         hud.add(coinsL);
@@ -312,19 +314,72 @@ public class GameGUI extends JPanel implements GameEngine.Listener {
         return strip;
     }
 
+    /**
+     * Toggles between PLAYING and PAUSED states with immediate UI update
+     * and audio feedback. Can be called via Esc, P, or the HUD Pause button.
+     */
+    public void togglePause() {
+        if (game == null || game.getEngine().isEnded()) {
+            return;
+        }
+        if (game.getEngine().isChallengeOpen()) {
+            return; // don't toggle pause if user is solving math challenge
+        }
+        SoundManager.getInstance().play(SoundManager.Sound.CLICK);
+        game.getEngine().togglePause();
+        onFrame();
+    }
+
+    /** Resumes from PAUSED to PLAYING. */
+    public void resumeGame() {
+        if (game == null || game.getEngine().isEnded()) {
+            return;
+        }
+        SoundManager.getInstance().play(SoundManager.Sound.CLICK);
+        game.getEngine().resume();
+        onFrame();
+    }
+
     private void installKeyBindings() {
-        // Esc / P toggle pause while the game screen is focused.
-        getInputMap(JComponent.WHEN_FOCUSED)
-                .put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "togglePause");
-        getInputMap(JComponent.WHEN_FOCUSED)
-                .put(KeyStroke.getKeyStroke(KeyEvent.VK_P, 0), "togglePause");
-        getActionMap().put("togglePause", new AbstractAction() {
+        Action toggleAction = new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (game != null && !game.getEngine().isEnded()) {
-                    game.getEngine().togglePause();
+                if (isShowing()) {
+                    togglePause();
                 }
             }
+        };
+
+        // Esc / P toggle pause while the game screen is showing.
+        for (int condition : new int[] {
+                JComponent.WHEN_IN_FOCUSED_WINDOW,
+                JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT,
+                JComponent.WHEN_FOCUSED }) {
+            InputMap im = getInputMap(condition);
+            im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "togglePause");
+            im.put(KeyStroke.getKeyStroke(KeyEvent.VK_P, 0), "togglePause");
+            im.put(KeyStroke.getKeyStroke(KeyEvent.VK_P, KeyEvent.SHIFT_DOWN_MASK), "togglePause");
+            im.put(KeyStroke.getKeyStroke('p'), "togglePause");
+            im.put(KeyStroke.getKeyStroke('P'), "togglePause");
+        }
+        getActionMap().put("togglePause", toggleAction);
+
+        // Also register a window-wide KeyEventDispatcher so Esc / P triggers reliably
+        // regardless of which component inside the game window currently has focus.
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(e -> {
+            if (e.getID() != KeyEvent.KEY_PRESSED) {
+                return false;
+            }
+            if (e.getKeyCode() == KeyEvent.VK_ESCAPE || e.getKeyCode() == KeyEvent.VK_P) {
+                if (isShowing() && game != null && !game.getEngine().isEnded()) {
+                    if (game.getEngine().isChallengeOpen()) {
+                        return false;
+                    }
+                    togglePause();
+                    return true;
+                }
+            }
+            return false;
         });
     }
     // ------------------------------------------------------------------
@@ -512,6 +567,9 @@ public class GameGUI extends JPanel implements GameEngine.Listener {
 
         modeL.setText(engine.getQuestionManager().getModeLabel());
         modeL.setForeground(Theme.SUCCESS);
+
+        boolean paused = engine.getState() == GameState.PAUSED;
+        pauseBtn.setText(paused ? "RESUME" : "PAUSE");
     }
 
     /** Drives the board/challenge/pause card switching from engine state. */

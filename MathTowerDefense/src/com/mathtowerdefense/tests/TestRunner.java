@@ -466,6 +466,12 @@ public final class TestRunner {
         engine.togglePause();
         checkEquals("pause transitions to PAUSED",
                 com.mathtowerdefense.engine.GameState.PAUSED, engine.getState());
+        engine.togglePause();
+        checkEquals("togglePause again transitions back to PLAYING",
+                com.mathtowerdefense.engine.GameState.PLAYING, engine.getState());
+        engine.togglePause();
+        checkEquals("togglePause transitions to PAUSED",
+                com.mathtowerdefense.engine.GameState.PAUSED, engine.getState());
         engine.resume();
         checkEquals("resume returns to PLAYING",
                 com.mathtowerdefense.engine.GameState.PLAYING, engine.getState());
